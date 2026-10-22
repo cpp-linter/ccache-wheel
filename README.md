@@ -45,7 +45,7 @@ configuration and remote storage.
 | **macOS** 10.15+ / 11.0+ | Intel (x86_64) and Apple Silicon (arm64) | `macosx_10_15_x86_64.macosx_11_0_arm64.macosx_10_15_universal2` |
 | **Linux** (glibc 2.17+ and musl) | x86_64 | `manylinux_2_17_x86_64.manylinux2014_x86_64.musllinux_1_1_x86_64` |
 | **Linux** (glibc 2.17+ and musl) | aarch64 | `manylinux_2_17_aarch64.manylinux2014_aarch64.musllinux_1_1_aarch64` |
-| **Linux** (glibc 2.17+ and musl) | riscv64 | `manylinux_2_17_riscv64.musllinux_1_1_riscv64` |
+| **Linux** (glibc 2.31+ and musl) | riscv64 | `manylinux_2_31_riscv64.musllinux_1_1_riscv64` |
 | **Linux** (glibc 2.17+ and musl) | s390x | `manylinux_2_17_s390x.manylinux2014_s390x.musllinux_1_1_s390x` |
 | **Windows** | 64-bit | `win_amd64` |
 
