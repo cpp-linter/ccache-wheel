@@ -10,7 +10,7 @@ license = "GPL-3.0-or-later"
 # Staged from the upstream archives by hatch_build.py during the build.
 license-files = ["upstream/GPL-3.0.txt", "upstream/LICENSE.md"]
 authors = [{ name = "Joel Rosdahl and the ccache contributors" }]
-maintainers = [{ name = "cpp-linter" }]
+maintainers = [{ name = "Xianpeng Shen", email = "xianpeng.shen@gmail.com" }]
 keywords = ["ccache", "compiler", "cache", "c", "c++", "build"]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
