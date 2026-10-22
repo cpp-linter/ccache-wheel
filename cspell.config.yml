@@ -1,0 +1,9 @@
+version: "0.2"
+language: en
+words:
+  - ccache
+  - minisig
+  - minisign
+  - musllinux
+  - manylinux
+  - sccache

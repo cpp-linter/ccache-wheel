@@ -1,0 +1,192 @@
+name: Test
+
+# Build the wheels from the upstream ccache binaries, then install and test
+# them on every supported platform. publish.yml calls this workflow before it
+# uploads anything.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+  workflow_call:
+    outputs:
+      version:
+        description: Wheel version, from ccache_version.txt
+        value: ${{ jobs.build.outputs.version }}
+      upstream_version:
+        description: ccache version inside the wheels
+        value: ${{ jobs.build.outputs.upstream_version }}
+
+permissions: {}
+
+jobs:
+  build:
+    name: Build wheels
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      upstream_version: ${{ steps.version.outputs.upstream_version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.x"
+      - run: python -m pip install --group build
+      - name: Read the version
+        id: version
+        run: |
+          version=$(cat ccache_version.txt)
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "upstream_version=${version%%.post*}" >> "$GITHUB_OUTPUT"
+      # Each wheel downloads and verifies one upstream binary (hatch_build.py).
+      - name: Build the wheels
+        run: |
+          for platform in $(python hatch_build.py platforms); do
+            CCACHE_PLATFORM=$platform python -m build --wheel --outdir dist
+          done
+      - name: Save the ccache source code for the release
+        run: python hatch_build.py source release
+      - name: Check distributions
+        run: pipx run twine check --strict dist/*
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: wheels
+          path: dist/
+          if-no-files-found: error
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-files
+          path: release/
+          if-no-files-found: error
+
+  test:
+    name: Test ${{ matrix.name }}
+    needs: build
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux x86_64
+            os: ubuntu-latest
+          - name: Linux aarch64
+            os: ubuntu-24.04-arm
+          - name: macOS x86_64
+            os: macos-15-intel
+          - name: macOS arm64
+            os: macos-latest
+          - name: Windows x86_64 (MSVC)
+            os: windows-latest
+    env:
+      VERSION: ${{ needs.build.outputs.upstream_version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.x"
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: wheels
+          path: dist
+      - name: Set up MSVC
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
+      - name: Install with pip and test
+        shell: bash
+        run: |
+          python -m venv .venv-pip
+          if [ "$RUNNER_OS" = Windows ]; then bin=.venv-pip/Scripts; else bin=.venv-pip/bin; fi
+          "$bin/python" -m pip install --no-index --find-links dist ccache
+          PATH="$PWD/$bin:$PATH" "$bin/python" tests/smoke_test.py --version "$VERSION"
+      - name: Install with uv and test
+        shell: bash
+        run: |
+          uv venv .venv-uv
+          if [ "$RUNNER_OS" = Windows ]; then bin=.venv-uv/Scripts; else bin=.venv-uv/bin; fi
+          uv pip install --python .venv-uv --no-index --find-links dist ccache
+          PATH="$PWD/$bin:$PATH" "$bin/python" tests/smoke_test.py --version "$VERSION"
+
+  test-linux-containers:
+    name: Test ${{ matrix.name }}
+    needs: build
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Alpine x86_64 (musl)
+            os: ubuntu-latest
+            image: alpine:3.21
+            platform: linux/amd64
+            setup: apk add --no-cache python3 gcc musl-dev
+            python: python3
+          - name: Alpine aarch64 (musl)
+            os: ubuntu-24.04-arm
+            image: alpine:3.21
+            platform: linux/arm64
+            setup: apk add --no-cache python3 gcc musl-dev
+            python: python3
+          - name: manylinux2014 x86_64 (glibc 2.17)
+            os: ubuntu-latest
+            image: quay.io/pypa/manylinux2014_x86_64
+            platform: linux/amd64
+            # gcc is preinstalled; Python lives in /opt/python
+            setup: "true"
+            python: /opt/python/cp312-cp312/bin/python
+          - name: Alpine riscv64 (QEMU)
+            os: ubuntu-latest
+            image: alpine:3.21
+            platform: linux/riscv64
+            qemu: riscv64
+            setup: apk add --no-cache python3 gcc musl-dev
+            python: python3
+          - name: Alpine s390x (QEMU)
+            os: ubuntu-latest
+            image: alpine:3.21
+            platform: linux/s390x
+            qemu: s390x
+            setup: apk add --no-cache python3 gcc musl-dev
+            python: python3
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: wheels
+          path: dist
+      - name: Set up QEMU
+        if: matrix.qemu
+        uses: docker/setup-qemu-action@06116385d9baf250c9f4dcb4858b16962ea869c3 # v4.1.0
+        with:
+          platforms: ${{ matrix.qemu }}
+      # Actions run on Node.js, which these images cannot run (old glibc,
+      # emulated architectures), so the test runs through `docker run`.
+      - name: Install and test in ${{ matrix.image }}
+        env:
+          IMAGE: ${{ matrix.image }}
+          PLATFORM: ${{ matrix.platform }}
+          SETUP: ${{ matrix.setup }}
+          PYTHON: ${{ matrix.python }}
+          VERSION: ${{ needs.build.outputs.upstream_version }}
+        run: |
+          docker run --rm --platform "$PLATFORM" -v "$PWD:/w" -w /w \
+            -e SETUP -e PYTHON -e VERSION "$IMAGE" sh -euc '
+              sh -c "$SETUP"
+              "$PYTHON" -m venv /tmp/venv
+              /tmp/venv/bin/python -m pip install --no-index --find-links dist ccache
+              PATH="/tmp/venv/bin:$PATH" /tmp/venv/bin/python tests/smoke_test.py --version "$VERSION"
+            '

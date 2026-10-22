@@ -1,0 +1,53 @@
+[build-system]
+requires = ["hatchling>=1.27", "cryptography>=42"]
+build-backend = "hatchling.build"
+
+[project]
+name = "ccache"
+description = "ccache, the C/C++ compiler cache, packaged as Python wheels"
+readme = "README.md"
+license = "GPL-3.0-or-later"
+# Staged from the upstream archives by hatch_build.py during the build.
+license-files = ["upstream/GPL-3.0.txt", "upstream/LICENSE.md"]
+authors = [{ name = "Joel Rosdahl and the ccache contributors" }]
+maintainers = [{ name = "Xianpeng Shen", email = "xianpeng.shen@gmail.com" }]
+keywords = ["ccache", "compiler", "cache", "c", "c++", "build"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "Operating System :: MacOS",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: C",
+    "Programming Language :: C++",
+    "Topic :: Software Development :: Build Tools",
+    "Topic :: Software Development :: Compilers",
+]
+dynamic = ["version"]
+
+[project.urls]
+Homepage = "https://ccache.dev"
+Documentation = "https://ccache.dev/documentation.html"
+Changelog = "https://ccache.dev/releasenotes.html"
+Upstream = "https://github.com/ccache/ccache"
+Source = "https://github.com/cpp-linter/ccache-wheel"
+Issues = "https://github.com/cpp-linter/ccache-wheel/issues"
+
+[dependency-groups]
+build = ["build", "cryptography>=42"]
+dev = [{ include-group = "build" }, "pre-commit"]
+
+[tool.hatch.version]
+path = "ccache_version.txt"
+pattern = "(?P<version>.+)"
+
+# hatch_build.py downloads and verifies the upstream ccache files (metadata
+# hook), then puts the binary and its man page into the wheel (build hook).
+[tool.hatch.metadata.hooks.custom]
+
+[tool.hatch.build.targets.wheel]
+# Only the files added by the build hook, plus the license files.
+bypass-selection = true
+core-metadata-version = "2.4"
+
+[tool.hatch.build.targets.wheel.hooks.custom]

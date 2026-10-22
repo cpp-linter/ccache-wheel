@@ -1,0 +1,53 @@
+name: Release Drafter
+
+on:
+  push:
+    branches:
+      - "main"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  draft-release:
+    permissions:
+      # write permission is required to create a github release
+      contents: write
+      pull-requests: read
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # The release version is the ccache version in ccache_version.txt,
+      # not one calculated from the PR titles.
+      - name: Generate release notes header
+        id: header
+        run: |
+          version=$(cat ccache_version.txt)
+          upstream=${version%%.post*}
+          {
+            echo "version=$version"
+            echo "header<<EOF"
+            echo "Python wheels of [ccache $upstream](https://ccache.dev/releasenotes.html#_ccache_${upstream//./_}), repackaged unchanged from the [signed upstream binaries](https://github.com/ccache/ccache/releases/tag/v$upstream)."
+            echo ""
+            echo '```bash'
+            echo "pip install ccache==$version"
+            echo '```'
+            echo ""
+            echo "The wheels are on [PyPI](https://pypi.org/project/ccache/$version/) and attached below, together with the corresponding ccache source code (\`ccache-$upstream.tar.gz\` and its \`.minisig\` signature)."
+            echo ""
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      # Draft your next Release notes as Pull Requests are merged into the default branch
+      - uses: release-drafter/release-drafter@978bb0b30c5ee8cdd332ced253758157150d43f0 # v7.10.0
+        with:
+          commitish: "main"
+          version: ${{ steps.header.outputs.version }}
+          header: ${{ steps.header.outputs.header }}
+          config-name: github:cpp-linter/.github:/.github/release-drafter.yml
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

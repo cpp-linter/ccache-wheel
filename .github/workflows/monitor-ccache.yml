@@ -1,0 +1,52 @@
+name: Monitor ccache releases
+
+# Check every day whether ccache has a release newer than the one in
+# ccache_version.txt, and open an issue as a reminder when it does.
+
+on:
+  schedule:
+    - cron: "0 8 * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  check:
+    if: github.repository_owner == 'cpp-linter'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Compare with the latest ccache release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_DRAFTS: ${{ github.server_url }}/${{ github.repository }}/releases
+        run: |
+          current=$(cat ccache_version.txt)
+          current=${current%%.post*}
+          latest=$(gh api repos/ccache/ccache/releases/latest --jq .tag_name | sed 's/^v//')
+          echo "Packaged: $current, latest upstream: $latest"
+          if [ -z "$latest" ] || [ "$(printf '%s\n%s\n' "$current" "$latest" | sort -V | tail -n 1)" = "$current" ]; then
+            echo "Up to date."
+            exit 0
+          fi
+
+          title="ccache $latest is available"
+          existing=$(gh issue list --state open --search "\"$title\" in:title" --json number --jq '.[0].number')
+          if [ -n "$existing" ]; then
+            echo "Issue #$existing already tracks ccache $latest."
+            exit 0
+          fi
+
+          cat > issue.md <<EOF
+          [ccache $latest](https://github.com/ccache/ccache/releases/tag/v$latest) is out; the wheels are at $current.
+
+          1. Open a PR titled \`feat: update ccache to $latest\` that sets \`ccache_version.txt\` to \`$latest\`. Its CI builds and tests the new wheels.
+          2. Merge it. The release draft becomes v$latest.
+          3. Publish the [draft release]($RELEASE_DRAFTS) to upload the wheels to PyPI.
+          EOF
+          gh issue create --title "$title" --body-file issue.md

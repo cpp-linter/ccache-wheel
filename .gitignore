@@ -1,0 +1,6 @@
+dist/
+release/
+__pycache__/
+.venv/
+upstream/
+.cache/
