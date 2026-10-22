@@ -1,0 +1,16 @@
+name: pre-commit
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+    branches: [main]
+
+permissions: {}
+
+jobs:
+  pre-commit:
+    permissions:
+      contents: read
+    uses: cpp-linter/.github/.github/workflows/pre-commit.yml@main

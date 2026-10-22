@@ -1,0 +1,5 @@
+downloads/
+dist/
+release/
+__pycache__/
+.venv/

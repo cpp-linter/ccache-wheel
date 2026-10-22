@@ -1,0 +1,225 @@
+name: Build and publish wheels
+
+# Pull requests and pushes to main build the wheels and test them on every
+# platform. Pushes to main also upload them to TestPyPI. Publishing the
+# GitHub release drafted by release-drafter uploads them to PyPI.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    name: Build wheels
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.build.outputs.version }}
+      upstream_version: ${{ steps.build.outputs.upstream_version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.x"
+      - run: python -m pip install -r requirements.txt
+      - name: Download, verify and repackage ccache
+        id: build
+        run: python build_wheels.py
+      - name: Check distributions
+        run: pipx run twine check --strict dist/*
+      - name: Check the release tag
+        if: github.event_name == 'release'
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+          VERSION: ${{ steps.build.outputs.version }}
+        run: |
+          if [ "$TAG" != "v$VERSION" ]; then
+            echo "::error::Release tag $TAG does not match ccache_version.txt ($VERSION)"
+            exit 1
+          fi
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: wheels
+          path: dist/
+          if-no-files-found: error
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-files
+          path: release/
+          if-no-files-found: error
+
+  test:
+    name: Test ${{ matrix.name }}
+    needs: build
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux x86_64
+            os: ubuntu-latest
+          - name: Linux aarch64
+            os: ubuntu-24.04-arm
+          - name: macOS x86_64
+            os: macos-15-intel
+          - name: macOS arm64
+            os: macos-latest
+          - name: Windows x86_64 (MSVC)
+            os: windows-latest
+    env:
+      VERSION: ${{ needs.build.outputs.upstream_version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.x"
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: wheels
+          path: dist
+      - name: Set up MSVC
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
+      - name: Install with pip and test
+        shell: bash
+        run: |
+          python -m venv .venv-pip
+          if [ "$RUNNER_OS" = Windows ]; then bin=.venv-pip/Scripts; else bin=.venv-pip/bin; fi
+          "$bin/python" -m pip install --no-index --find-links dist ccache
+          PATH="$PWD/$bin:$PATH" "$bin/python" tests/smoke_test.py --version "$VERSION"
+      - name: Install with uv and test
+        shell: bash
+        run: |
+          uv venv .venv-uv
+          if [ "$RUNNER_OS" = Windows ]; then bin=.venv-uv/Scripts; else bin=.venv-uv/bin; fi
+          uv pip install --python .venv-uv --no-index --find-links dist ccache
+          PATH="$PWD/$bin:$PATH" "$bin/python" tests/smoke_test.py --version "$VERSION"
+
+  test-linux-containers:
+    name: Test ${{ matrix.name }}
+    needs: build
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Alpine x86_64 (musl)
+            os: ubuntu-latest
+            image: alpine:3.21
+            platform: linux/amd64
+          - name: Alpine aarch64 (musl)
+            os: ubuntu-24.04-arm
+            image: alpine:3.21
+            platform: linux/arm64
+          - name: manylinux2014 x86_64 (glibc 2.17)
+            os: ubuntu-latest
+            image: quay.io/pypa/manylinux2014_x86_64
+            platform: linux/amd64
+          - name: Alpine riscv64 (QEMU)
+            os: ubuntu-latest
+            image: alpine:3.21
+            platform: linux/riscv64
+            qemu: riscv64
+          - name: Alpine s390x (QEMU)
+            os: ubuntu-latest
+            image: alpine:3.21
+            platform: linux/s390x
+            qemu: s390x
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: wheels
+          path: dist
+      - name: Set up QEMU
+        if: matrix.qemu
+        uses: docker/setup-qemu-action@06116385d9baf250c9f4dcb4858b16962ea869c3 # v4.1.0
+        with:
+          platforms: ${{ matrix.qemu }}
+      - name: Install and test in ${{ matrix.image }}
+        env:
+          IMAGE: ${{ matrix.image }}
+          PLATFORM: ${{ matrix.platform }}
+          VERSION: ${{ needs.build.outputs.upstream_version }}
+        run: >-
+          docker run --rm --platform "$PLATFORM" -v "$PWD:/w" -w /w "$IMAGE"
+          sh tests/container_test.sh "$VERSION"
+
+  publish-testpypi:
+    name: Publish to TestPyPI
+    needs: [build, test, test-linux-containers]
+    if: github.event_name == 'push' && github.repository_owner == 'cpp-linter'
+    runs-on: ubuntu-latest
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/project/ccache/${{ needs.build.outputs.version }}/
+    permissions:
+      id-token: write # trusted publishing
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: wheels
+          path: dist
+      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          # Every push to main uploads; the version only changes with ccache_version.txt.
+          skip-existing: true
+
+  publish-pypi:
+    name: Publish to PyPI
+    needs: [build, test, test-linux-containers]
+    if: github.event_name == 'release' && github.repository_owner == 'cpp-linter'
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/ccache/${{ needs.build.outputs.version }}/
+    permissions:
+      contents: write # attach files to the release
+      id-token: write # trusted publishing and build provenance attestations
+      attestations: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: wheels
+          path: dist
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: release-files
+          path: release
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: dist/*.whl
+      # Attach the wheels and the ccache source code to the release first,
+      # so the source is available before the wheels are on PyPI.
+      - name: Attach files to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: gh release upload "$TAG" dist/*.whl release/* --clobber
+      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
