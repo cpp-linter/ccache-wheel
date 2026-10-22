@@ -28,8 +28,8 @@ jobs:
     permissions:
       contents: read
     outputs:
-      version: ${{ steps.build.outputs.version }}
-      upstream_version: ${{ steps.build.outputs.upstream_version }}
+      version: ${{ steps.version.outputs.version }}
+      upstream_version: ${{ steps.version.outputs.upstream_version }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -37,10 +37,21 @@ jobs:
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.x"
-      - run: python -m pip install -r requirements.txt
-      - name: Download, verify and repackage ccache
-        id: build
-        run: python build_wheels.py
+      - run: python -m pip install --group build
+      - name: Read the version
+        id: version
+        run: |
+          version=$(cat ccache_version.txt)
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "upstream_version=${version%%.post*}" >> "$GITHUB_OUTPUT"
+      # Each wheel downloads and verifies one upstream binary (hatch_build.py).
+      - name: Build the wheels
+        run: |
+          for platform in $(python hatch_build.py platforms); do
+            CCACHE_PLATFORM=$platform python -m build --wheel --outdir dist
+          done
+      - name: Save the ccache source code for the release
+        run: python hatch_build.py source release
       - name: Check distributions
         run: pipx run twine check --strict dist/*
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

@@ -10,21 +10,28 @@ request.
 ```bash
 git clone https://github.com/cpp-linter/ccache-wheel.git
 cd ccache-wheel
-python -m pip install -r requirements.txt pre-commit
+python -m pip install --group dev   # pip 25.1 or later
 pre-commit install
 ```
 
 ## Building the wheels
 
+The wheels are built with [hatchling](https://hatch.pypa.io/latest/) from `pyproject.toml`. The
+build hooks in `hatch_build.py` download the upstream ccache archive for one platform, check its
+minisign signature against the ccache release key
+(`RWQX7yXbBedVfI4PNx6FLdFXu9GHUFsr28s4BVGxm4BeybtnX3P06saF`, from
+[ccache.dev](https://ccache.dev/download.html)) and the binary's format, and put the binary, its
+man page and the license files into the wheel. The version comes from `ccache_version.txt`.
+
 ```bash
-python build_wheels.py   # the version in ccache_version.txt
+python -m build --wheel                                  # for this machine
+CCACHE_PLATFORM=windows-x86_64 python -m build --wheel   # for another platform
+python hatch_build.py platforms                          # list the platforms
+python hatch_build.py source release                     # ccache source code for a release
 ```
 
-`build_wheels.py` downloads each upstream archive, checks its minisign signature against the
-ccache release key (`RWQX7yXbBedVfI4PNx6FLdFXu9GHUFsr28s4BVGxm4BeybtnX3P06saF`, from
-[ccache.dev](https://ccache.dev/download.html)) and the binary's format, and writes the wheels to
-`dist/`. The ccache source archive, its signature and `SHA256SUMS` go to `release/`. The same
-input always gives the same wheels.
+`pip install .` builds and installs the wheel for this machine. The same input always gives the
+same wheels.
 
 ## Running Tests
 
