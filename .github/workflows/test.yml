@@ -120,24 +120,35 @@ jobs:
             os: ubuntu-latest
             image: alpine:3.21
             platform: linux/amd64
+            setup: apk add --no-cache python3 gcc musl-dev
+            python: python3
           - name: Alpine aarch64 (musl)
             os: ubuntu-24.04-arm
             image: alpine:3.21
             platform: linux/arm64
+            setup: apk add --no-cache python3 gcc musl-dev
+            python: python3
           - name: manylinux2014 x86_64 (glibc 2.17)
             os: ubuntu-latest
             image: quay.io/pypa/manylinux2014_x86_64
             platform: linux/amd64
+            # gcc is preinstalled; Python lives in /opt/python
+            setup: "true"
+            python: /opt/python/cp312-cp312/bin/python
           - name: Alpine riscv64 (QEMU)
             os: ubuntu-latest
             image: alpine:3.21
             platform: linux/riscv64
             qemu: riscv64
+            setup: apk add --no-cache python3 gcc musl-dev
+            python: python3
           - name: Alpine s390x (QEMU)
             os: ubuntu-latest
             image: alpine:3.21
             platform: linux/s390x
             qemu: s390x
+            setup: apk add --no-cache python3 gcc musl-dev
+            python: python3
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -151,11 +162,20 @@ jobs:
         uses: docker/setup-qemu-action@06116385d9baf250c9f4dcb4858b16962ea869c3 # v4.1.0
         with:
           platforms: ${{ matrix.qemu }}
+      # Actions run on Node.js, which these images cannot run (old glibc,
+      # emulated architectures), so the test runs through `docker run`.
       - name: Install and test in ${{ matrix.image }}
         env:
           IMAGE: ${{ matrix.image }}
           PLATFORM: ${{ matrix.platform }}
+          SETUP: ${{ matrix.setup }}
+          PYTHON: ${{ matrix.python }}
           VERSION: ${{ needs.build.outputs.upstream_version }}
-        run: >-
-          docker run --rm --platform "$PLATFORM" -v "$PWD:/w" -w /w "$IMAGE"
-          sh tests/container_test.sh "$VERSION"
+        run: |
+          docker run --rm --platform "$PLATFORM" -v "$PWD:/w" -w /w \
+            -e SETUP -e PYTHON -e VERSION "$IMAGE" sh -euc '
+              sh -c "$SETUP"
+              "$PYTHON" -m venv /tmp/venv
+              /tmp/venv/bin/python -m pip install --no-index --find-links dist ccache
+              PATH="/tmp/venv/bin:$PATH" /tmp/venv/bin/python tests/smoke_test.py --version "$VERSION"
+            '
