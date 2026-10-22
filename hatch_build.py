@@ -87,7 +87,9 @@ PLATFORMS = [
         "linux-riscv64-musl-static",
         "tar.gz",
         "ccache",
-        "manylinux_2_17_riscv64.musllinux_1_1_riscv64",
+        # uv only accepts manylinux_2_31 or newer for riscv64, the first glibc
+        # with a manylinux image for it.
+        "manylinux_2_31_riscv64.musllinux_1_1_riscv64",
         "elf-riscv64",
     ),
     Platform(
