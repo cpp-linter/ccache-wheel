@@ -260,10 +260,8 @@ def record_hash(data: bytes) -> str:
 
 
 def metadata(version: str, upstream_version: str) -> str:
-    readme = (ROOT / "PYPI_README.md").read_text(encoding="utf-8")
-    readme = readme.replace("{version}", upstream_version).replace(
-        "{wheel_version}", version
-    )
+    # README.md is also the PyPI project description, so its links are absolute.
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
     headers = [
         ("Metadata-Version", "2.4"),
         ("Name", "ccache"),

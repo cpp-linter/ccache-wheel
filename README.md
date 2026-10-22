@@ -75,5 +75,6 @@ feature requests.
 The build scripts and workflows in this repository are released under the
 [MIT License](https://github.com/cpp-linter/ccache-wheel/blob/main/LICENSE). ccache, and so the
 wheels, are under the [GNU General Public License v3.0 or later](https://ccache.dev/license.html):
-the wheels carry its license files, and every release of this repository includes the matching
-ccache source archive.
+the wheels carry its license files, and every
+[release](https://github.com/cpp-linter/ccache-wheel/releases) of this repository includes the
+matching ccache source archive and its signature.
