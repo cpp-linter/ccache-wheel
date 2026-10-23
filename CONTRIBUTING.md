@@ -37,7 +37,7 @@ same wheels.
 
 ```bash
 python -m venv .venv
-.venv/bin/python -m pip install --no-index --find-links dist ccache
+.venv/bin/python -m pip install --no-index --find-links dist ccache-bin
 PATH="$PWD/.venv/bin:$PATH" .venv/bin/python tests/smoke_test.py --version "$(cat ccache_version.txt)"
 ```
 

@@ -3,7 +3,7 @@ requires = ["hatchling>=1.27", "cryptography>=42"]
 build-backend = "hatchling.build"
 
 [project]
-name = "ccache"
+name = "ccache-bin"
 description = "ccache, the C/C++ compiler cache, packaged as Python wheels"
 readme = "README.md"
 license = "GPL-3.0-or-later"

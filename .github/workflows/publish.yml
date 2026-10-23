@@ -27,7 +27,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: testpypi
-      url: https://test.pypi.org/project/ccache/${{ needs.test.outputs.version }}/
+      url: https://test.pypi.org/project/ccache-bin/${{ needs.test.outputs.version }}/
     permissions:
       id-token: write # trusted publishing
     steps:
@@ -47,7 +47,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: pypi
-      url: https://pypi.org/project/ccache/${{ needs.test.outputs.version }}/
+      url: https://pypi.org/project/ccache-bin/${{ needs.test.outputs.version }}/
     permissions:
       contents: write # attach files to the release
       id-token: write # trusted publishing and build provenance attestations
