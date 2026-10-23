@@ -34,10 +34,10 @@ jobs:
             echo "Python wheels of [ccache $upstream](https://ccache.dev/releasenotes.html#_ccache_${upstream//./_}), repackaged unchanged from the [signed upstream binaries](https://github.com/ccache/ccache/releases/tag/v$upstream)."
             echo ""
             echo '```bash'
-            echo "pip install ccache==$version"
+            echo "pip install ccache-bin==$version"
             echo '```'
             echo ""
-            echo "The wheels are on [PyPI](https://pypi.org/project/ccache/$version/) and attached below, together with the corresponding ccache source code (\`ccache-$upstream.tar.gz\` and its \`.minisig\` signature)."
+            echo "The wheels are on [PyPI](https://pypi.org/project/ccache-bin/$version/) and attached below, together with the corresponding ccache source code (\`ccache-$upstream.tar.gz\` and its \`.minisig\` signature)."
             echo ""
             echo "EOF"
           } >> "$GITHUB_OUTPUT"

@@ -1,23 +1,27 @@
 # ccache-wheel
 
-[![PyPI](https://img.shields.io/pypi/v/ccache?labelColor=454a63&color=007ec6)](https://pypi.org/project/ccache/)
+[![PyPI](https://img.shields.io/pypi/v/ccache-bin?labelColor=454a63&color=007ec6)](https://pypi.org/project/ccache-bin/)
 [![ci](https://img.shields.io/github/actions/workflow/status/cpp-linter/ccache-wheel/test.yml?branch=main&label=ci&labelColor=454a63)](https://github.com/cpp-linter/ccache-wheel/actions/workflows/test.yml)
 [![part of cpp-linter](https://img.shields.io/badge/part%20of-cpp--linter-ffc20a?labelColor=454a63)](https://cpp-linter.github.io/)
 
-[ccache](https://ccache.dev), the C/C++ compiler cache, as Python wheels on PyPI. The wheels
-contain the official ccache binaries, unchanged.
+[ccache](https://ccache.dev), the C/C++ compiler cache, as Python wheels on PyPI
+(`ccache-bin`). The wheels contain the official ccache binaries, unchanged, and install the
+`ccache` command.
 
 [Website](https://cpp-linter.github.io/) ·
-[PyPI](https://pypi.org/project/ccache/) ·
+[PyPI](https://pypi.org/project/ccache-bin/) ·
 [ccache manual](https://ccache.dev/manual/latest.html) ·
 [Discussions](https://github.com/orgs/cpp-linter/discussions)
 
 ## Quick start
 
 ```bash
-pip install ccache            # or: uv tool install ccache
+pip install ccache-bin        # or: uv tool install ccache-bin
 ccache --version
 ```
+
+The package is called `ccache-bin` because the name `ccache` is not available on PyPI. The
+command it installs is still `ccache` (with uvx: `uvx --from ccache-bin ccache --version`).
 
 ## Usage
 

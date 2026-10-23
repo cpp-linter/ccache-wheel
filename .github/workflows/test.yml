@@ -67,7 +67,7 @@ jobs:
             x86_64-unknown-linux-musl aarch64-unknown-linux-musl \
             x86_64-apple-darwin aarch64-apple-darwin x86_64-pc-windows-msvc
           do
-            echo "ccache==$VERSION" | uv pip compile --quiet --no-header \
+            echo "ccache-bin==$VERSION" | uv pip compile --quiet --no-header \
               --no-index --find-links dist --python-platform "$target" -
           done
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -123,14 +123,14 @@ jobs:
         run: |
           python -m venv .venv-pip
           if [ "$RUNNER_OS" = Windows ]; then bin=.venv-pip/Scripts; else bin=.venv-pip/bin; fi
-          "$bin/python" -m pip install --no-index --find-links dist ccache
+          "$bin/python" -m pip install --no-index --find-links dist ccache-bin
           PATH="$PWD/$bin:$PATH" "$bin/python" tests/smoke_test.py --version "$VERSION"
       - name: Install with uv and test
         shell: bash
         run: |
           uv venv .venv-uv
           if [ "$RUNNER_OS" = Windows ]; then bin=.venv-uv/Scripts; else bin=.venv-uv/bin; fi
-          uv pip install --python .venv-uv --no-index --find-links dist ccache
+          uv pip install --python .venv-uv --no-index --find-links dist ccache-bin
           PATH="$PWD/$bin:$PATH" "$bin/python" tests/smoke_test.py --version "$VERSION"
 
   test-linux-containers:
@@ -203,6 +203,6 @@ jobs:
             -e SETUP -e PYTHON -e VERSION "$IMAGE" sh -euc '
               sh -c "$SETUP"
               "$PYTHON" -m venv /tmp/venv
-              /tmp/venv/bin/python -m pip install --no-index --find-links dist ccache
+              /tmp/venv/bin/python -m pip install --no-index --find-links dist ccache-bin
               PATH="/tmp/venv/bin:$PATH" /tmp/venv/bin/python tests/smoke_test.py --version "$VERSION"
             '
