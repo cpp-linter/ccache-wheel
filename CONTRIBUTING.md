@@ -55,9 +55,11 @@ pre-commit run --all-files
 
 ## Releasing
 
-1. When ccache has a new release, a daily workflow opens an issue.
-2. Open a PR titled `feat: update ccache to <version>` that sets `ccache_version.txt` to the new
-   version. PR titles follow [Conventional Commits](https://www.conventionalcommits.org/).
+1. When ccache has a new release, a daily workflow opens a PR titled
+   `feat: update ccache to <version>` that sets `ccache_version.txt` to the new version. PR titles
+   follow [Conventional Commits](https://www.conventionalcommits.org/).
+2. Close and reopen that PR to start its CI (GitHub does not start CI on a PR that a workflow
+   opened), then merge it.
 3. After the merge, Release Drafter drafts the `v<version>` release. The version always comes from
    `ccache_version.txt`.
 4. Optional: run the **Upload Python Package** workflow on `main` to upload the wheels to TestPyPI.

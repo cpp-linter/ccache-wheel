@@ -1,7 +1,7 @@
 name: Monitor ccache releases
 
 # Check every day whether ccache has a release newer than the one in
-# ccache_version.txt, and open an issue as a reminder when it does.
+# ccache_version.txt, and open a pull request that updates it when it does.
 
 on:
   schedule:
@@ -15,38 +15,52 @@ jobs:
     if: github.repository_owner == 'cpp-linter'
     runs-on: ubuntu-latest
     permissions:
-      contents: read
-      issues: write
+      # push the branch and open the pull request
+      contents: write
+      pull-requests: write
+    concurrency:
+      group: update-ccache
+      cancel-in-progress: true
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: Compare with the latest ccache release
+        id: latest
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_DRAFTS: ${{ github.server_url }}/${{ github.repository }}/releases
         run: |
           current=$(cat ccache_version.txt)
           current=${current%%.post*}
           latest=$(gh api repos/ccache/ccache/releases/latest --jq .tag_name | sed 's/^v//')
           echo "Packaged: $current, latest upstream: $latest"
-          if [ -z "$latest" ] || [ "$(printf '%s\n%s\n' "$current" "$latest" | sort -V | tail -n 1)" = "$current" ]; then
+          if ! [[ "$latest" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]; then
+            echo "::error::Unexpected ccache release tag '$latest'."
+            exit 1
+          fi
+          if [ "$(printf '%s\n%s\n' "$current" "$latest" | sort -V | tail -n 1)" = "$current" ]; then
             echo "Up to date."
             exit 0
           fi
+          echo "$latest" > ccache_version.txt
+          echo "version=$latest" >> "$GITHUB_OUTPUT"
 
-          title="ccache $latest is available"
-          existing=$(gh issue list --state open --search "\"$title\" in:title" --json number --jq '.[0].number')
-          if [ -n "$existing" ]; then
-            echo "Issue #$existing already tracks ccache $latest."
-            exit 0
-          fi
+      - name: Open or update the pull request
+        if: steps.latest.outputs.version != ''
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
+        with:
+          token: ${{ github.token }}
+          sign-commits: true
+          branch: update-ccache
+          delete-branch: true
+          commit-message: "feat: update ccache to ${{ steps.latest.outputs.version }}"
+          title: "feat: update ccache to ${{ steps.latest.outputs.version }}"
+          body: |
+            ccache ${{ steps.latest.outputs.version }} is out. This sets `ccache_version.txt` to it.
 
-          cat > issue.md <<EOF
-          [ccache $latest](https://github.com/ccache/ccache/releases/tag/v$latest) is out; the wheels are at $current.
-
-          1. Open a PR titled \`feat: update ccache to $latest\` that sets \`ccache_version.txt\` to \`$latest\`. Its CI builds and tests the new wheels.
-          2. Merge it. The release draft becomes v$latest.
-          3. Publish the [draft release]($RELEASE_DRAFTS) to upload the wheels to PyPI.
-          EOF
-          gh issue create --title "$title" --body-file issue.md
+            1. Close and reopen this pull request: GitHub does not start CI on a pull request
+               that a workflow opened. The CI builds the wheels from the new release, checks
+               the signatures of its files and tests the wheels.
+            2. Merge it. The release draft becomes v${{ steps.latest.outputs.version }}.
+            3. Publish the [draft release](${{ github.server_url }}/${{ github.repository }}/releases)
+               to upload the wheels to PyPI.
